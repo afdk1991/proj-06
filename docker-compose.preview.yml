@@ -1,0 +1,75 @@
+version: "3.8"
+
+# MYP 商城直播系统 - 本地预览编排
+# 用途：在宿主 3306 / 8080 / 8081 已被其他运行中容器占用时，以规避端口启动同一套服务栈。
+# 说明：Compose 对 ports 采用"追加合并"而非"替换"，因此不能用 override 覆盖原文件端口，
+#       故提供本独立文件，内容与原 docker-compose.yml 一致，仅调整宿主侧端口映射。
+# 启动: docker compose -f docker-compose.preview.yml -p myp006 up -d
+#
+# 访问地址（宿主端口与原配置不同）：
+#   商城前台         http://localhost:18080
+#   WordPress 后台   http://localhost:18080/wp-admin
+#   phpMyAdmin       http://localhost:18081   (root/root)
+#   SRS 控制台       http://localhost:8082
+
+services:
+  db:
+    image: mysql:5.7
+    container_name: myp-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: myp_shop
+      MYSQL_USER: myp_shop
+      MYSQL_PASSWORD: myp_shop_pwd
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "13306:3306"
+
+  wordpress:
+    image: wordpress:php8.0-apache
+    container_name: myp-wp
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - "18080:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: myp_shop
+      WORDPRESS_DB_USER: myp_shop
+      WORDPRESS_DB_PASSWORD: myp_shop_pwd
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_DEBUG', true);
+        define('WP_DEBUG_LOG', true);
+        define('DISALLOW_FILE_EDIT', true);
+    volumes:
+      - ./myp-core:/var/www/html/wp-content/plugins/myp-core
+      - ./myp-theme:/var/www/html/wp-content/themes/myp-theme
+      - wp_uploads:/var/www/html/wp-content/uploads
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: myp-pma
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - "18081:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+
+  srs:
+    image: ossrs/srs:5
+    container_name: myp-srs
+    restart: always
+    ports:
+      - "1935:1935"
+      - "8082:8080"
+      - "1985:1985"
+
+volumes:
+  db_data:
+  wp_uploads:
